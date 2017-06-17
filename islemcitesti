@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Bu program, işlemciyi %30 üzerinde kullannan uygulamaları tespit ede.
+# Bu program, işlemciyi %30 üzerinde kullanan uygulamaları tespit eder.
 # Yazar: mhmtkrtr
 # Kaynak: https://forum.ubuntu-tr.net/index.php?topic=56713.0
 
