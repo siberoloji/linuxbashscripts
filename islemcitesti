@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Bu program, işlemciyi %30 üzerinde kullannan uygulamaları tespit ede.
+# Yazar: mhmtkrtr
+# Kaynak: https://forum.ubuntu-tr.net/index.php?topic=56713.0
+
 message[0]='İşlemci Testi'
 message[1]='Testi başlattığınızda, sorun olduğunu düşündüğünüz işlemleri yapın. Bu test 30 saniye sürecek'
 message[2]='Test başlatıldı'
