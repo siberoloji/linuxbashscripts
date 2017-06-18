@@ -4,55 +4,391 @@
 # Yazar: mhmtkrtr
 # Kaynak: https://forum.ubuntu-tr.net/index.php?topic=56713.0
 
-message[0]='İşlemci Testi'
-message[1]='Testi başlattığınızda, sorun olduğunu düşündüğünüz işlemleri yapın. Bu test 30 saniye sürecek'
-message[2]='Test başlatıldı'
-message[3]='CPU Kullanımı:'
-message[4]="İşlemciyi %30 'un üzerinde kullanan uygulamalar"
-message[5]='Dialog paketi bulunamadı. öncelikle "dialog" paketini kurun'
-if [[ `which dialog 2>/dev/null` == "" ]]; then
-echo ${message[5]}; exit
-fi
-counter=100
-rm /tmp/{cpuinfo,cpuwarning} 2>/dev/null; echo >/tmp/cpuinfo
-dialog --title "${message[0]}" \
---yesno "\n${message[1]}" 7 60 2>&1
-case $? in
-   0)  while :; do
+message[0]='Sistem İşlemci Kullanım Testi'
+message[1]='\n  Uygulamanın doğruluğu için, öncelikle açık olan tüm programlarınızı kapatmanız önerilir..\n\n  Tüm test süreci boyunca bilgisayarınızı kullanmayınız. Test aşamasında birkaç efekt ve uygulama açılarak işlemci kullanımı kontrol edilecek.\n\n  Testi başlatmak istiyormusunuz ?\n\n'
+message[2]='Test Süresi Seçimi'
+message[3]='\n Testin yapılacağı toplam süreyi aşağıdan seçebilirsiniz.\n\n Sürenin uzunluğu sonucun doğruluk oranını kısmen etkiler. '
+message[4]='İşlemci Yüzdesi Seçimi (%)'
+message[5]='\n Uygulamaların başlatılması, sistem efektleri gibi işlemci kullanımını üst seviyelere taşıyacak işlemler için test yapılacak seviyeyi seçebilirsiniz. \n\n Bu seçim, uygulamanın kritik uygulama analizinde ki oranı etkilemez.\n\n'
+message[6]='İşlemci Testi Başladı'
+message[7]='\n  Uygulamalar başlatılacak.. \n\n  Ortam test ediliyor.....'
+message[8]='\n Uygulama testi tamamlandı. \n\n Analiz için karşılaştırma değerleri alınıyor. \n\n Lütfen Bekleyin !.................. '
+message[9]='\n Bilgiler alındı.. Sonuçlar kontrol ediliyor...'
+message[10]='\n Test tamamlandı. Sonuçlar listeleniyor..'
+message[11]='\n\n\n  İşlemci kullanımı %1 ve üzerinde bulunan uygulamaların listesi : \n Burada listelenen uygulamalar, genellikle sistemin arkaplan uygulamaları olup, \n sistem performansını aşırı düzeyde etkilemezler.\n'
+message[12]='  Uygulamaların başlangıç aşamasında ki anlık yükselme değerleri : \n
+ Özellikle 64 bit ve veriyolu hızlı olan bilgisayarlarda,\n anlık yüksek kullanım normaldir.\n '
+message[13]='\n  Sistem performansını etkileyebilecek uygulamaların listesi : \n
+ Bu listede bulunan uygulamalar, sistemde sürekli olarak belirli bir \n seviyenin üstünde kaynak kullanakta. Bu uygulamaların durumunu araştırmanız,\n ve varsa sorunu gidermeniz genel sistem performansınız için yararlı olabilir.\n'
+message[14]="  İşlemciyi %30 'un üzerinde kullanan uygulamalar"
+message[15]='\n Betiğin ihtiyaç duyduğu şu paketler sisteminizde mevcut değil ! \n\n Paketler :'
+message[16]='\n Eksik paketler kurulsun mu? [e\h] : '
+message[17]='\n Eksik paketleri kurup tekrar deneyin....\n\n'
+message[18]='\n Bilgisayarınızda performans kaybına yol açabilecek bir uygulama tesbit edilemedi.\n\n'
+message[19]="\n Aynı uygulama için daha önce yapılan testlerde,\n eşik değerinin üzerinde kullanım tesbit edilmiş.\n Daha önce yaptığınız testlerin son `wc -l ~/.local/Cpuinfo.log|cut -d' ' -f1` satırı aşağıda listeleniyor \n"
+Ssound[1]='/usr/share/sounds/gnome/default/alerts/Xylo.ogg'
+Ssound[2]='suspend-error'
+    TestLink='https://www.youtube.com/watch?v=XMm0HsmOTFI'
+    counter=100
+    ATiMe=7
+    TMPDIR=$(dirname $(mktemp -u))
+    TMP=$TMPDIR/CPUTEST
+    rm -r $TMP 2>/dev/null
+    mkdir $TMP
+
+    Plist=()
+    for pkg in "gtkdialog" "hwinfo" "xdotool" "wmctrl"; do
+	if ! which $pkg &>/dev/null; then 
+	 declare Plist+=("${pkg}")
+	fi
+    done
+  if [[ ! -z "${Plist[@]}" ]]; then 
+        echo -e "${message[15]} ${Plist[@]}"
+        
+     if type pacman >/dev/null 2>&1;then
+         echo -ne "${message[16]} "
+         read -p "" packinstall
+        [[ $packinstall == e ]] && sudo pacman -S "${Plist[@]}" --noconfirm || exit 0
+        sleep 2
+     elif type apt-get >/dev/null 2>&1;then
+         echo -ne "${message[16]} "
+         read -p "" packinstall
+        [[ $packinstall == e ]] && sudo apt-get install "${Plist[@]}" -y || exit 0
+        sleep 2
+    else
+        echo -e "${message[17]}"; exit 0
+    fi
+  fi 
+  
+	[[ -e ~/.dialogrc ]] || dialog --create-rc ~/.dialogrc
+
+	UseClr=`grep 'use_colors' ~/.dialogrc`
+	SetClr="use_colors = ON"
+	sed -i "s|$UseClr|$SetClr|" ~/.dialogrc
+	
+	TitleClr=`grep '^title_color' ~/.dialogrc`
+	SetTitle='title_color = (RED,WHITE,ON)'
+	sed -i "s|$TitleClr|$SetTitle|" ~/.dialogrc
+	
+	ScrClr=`grep '^screen_color' ~/.dialogrc`
+	SetScr='screen_color = (WHITE,BLUE,ON)'
+	sed -i "s|$ScrClr|$SetScr|" ~/.dialogrc
+	
+	UseShdw=`grep 'use_shadow' ~/.dialogrc`
+	SetShdw="use_shadow = OFF"
+	sed -i "s|$UseClr|$SetClr|" ~/.dialogrc
+
+	FuncSetDialColor() {
+	DefClr=`grep 'screen_color =' ~/.dialogrc`
+	sed -i "s|$DefClr|$1|" ~/.dialogrc
+	}
+	
+    CPUHW=`hwinfo --cpu`
+    CKRD=`echo "$CPUHW"|grep -c '^[0-9+]'`
+    MDL=`echo "$CPUHW"|awk -F'"' '/Model/{print $2}'|tail -1`
+    MMR=`echo "$CPUHW"|awk -F: '/Arch/{print $2}'|tail -1|xargs`
+    CLK=`echo "$CPUHW"|awk -F: '/Clock/{print $2}'|tail -1|xargs`
+    CCH=`echo "$CPUHW"|awk -F: '/Cache/{print $2}'|tail -1|xargs`
+
+	HWIN[1]="çekirdek:"
+	HWIN[2]="Clock:"
+	HWIN[3]="Cache:"
+	HWIN[4]="mimari:"
+
+    BACKTITLE="$MDL ${HWIN[1]}$CKRD ${HWIN[2]}$CLK ${HWIN[3]}$CCH ${HWIN[4]}$MMR"
+    
+FuncRunSomePrg() {
+	
+	sleep 3
+	
+	if [[ `echo $XDG_SESSION_DESKTOP|grep gnome` != "" ]]; then
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.layoutManager.hotCorners[Main.layoutManager.primaryIndex]._toggleOverview();' &>/dev/null
+	sleep 2
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.layoutManager.hotCorners[Main.layoutManager.primaryIndex]._toggleOverview();' &>/dev/null
+	sleep 2
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.overview.show(); if (! Main.overview.viewSelector._showAppsButton.checked) {Main.overview.viewSelector._showAppsButton.checked = true;} else {Main.overview.hide();};' &>/dev/null
+	sleep 3
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.overview.show(); if (! Main.overview.viewSelector._showAppsButton.checked) {Main.overview.viewSelector._showAppsButton.checked = true;} else {Main.overview.hide();};' &>/dev/null
+	sleep 2
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.layoutManager.hotCorners[Main.layoutManager.primaryIndex]._toggleOverview();' &>/dev/null
+	sleep 2
+dbus-send --session --type=method_call --dest=org.gnome.Shell /org/gnome/Shell org.gnome.Shell.Eval string:'Main.layoutManager.hotCorners[Main.layoutManager.primaryIndex]._toggleOverview();' &>/dev/null
+	fi
+	sleep 1
+	if type google-chrome >/dev/null 2>&1;then
+		nohup &>/dev/null google-chrome $TestLink &
+		sleep 15
+		pkill google-chrome &>/dev/null
+		
+	elif type google-chrome-stable >/dev/null 2>&1;then
+		nohup &>/dev/null google-chrome-stable $TestLink &
+		sleep 15
+		pkill chrome &>/dev/null
+
+	elif type opera >/dev/null 2>&1;then
+		nohup &>/dev/null opera $TestLink &
+		sleep 15
+		pkill opera &>/dev/null
+
+	elif type midori >/dev/null 2>&1;then
+		nohup &>/dev/null midori $TestLink &
+		sleep 15
+		pkill midori &>/dev/null
+
+	elif type chromium >/dev/null 2>&1;then
+		nohup &>/dev/null chromium $TestLink &
+		sleep 15
+		pkill chromium &>/dev/null
+	fi
+	sleep 3
+
+    	. ~/.config/user-dirs.dirs 
+
+    	TstC=0
+	while :; do
+	nohup &>/dev/null xdg-open $XDG_MUSIC_DIR &
+	sleep 1
+	[[ `wmctrl -l|grep "$(basename $XDG_MUSIC_DIR)"` != "" ]] && \
+	break
+	[[ $TstC -ge '3' ]] && break
+	(( TstC+=1 ))
+	done
+	sleep 1
+	xdotool key F9 &>/dev/null
+	sleep 1
+	xdotool key F10 &>/dev/null
+	sleep 1
+	xdotool key F10 &>/dev/null
+	sleep 1
+	xdotool key F9 &>/dev/null
+	sleep 2
+	xdotool windowclose `wmctrl -l | \
+	grep "$(basename $XDG_MUSIC_DIR)"|cut -d' ' -f1` &>/dev/null
+	sleep 2
+	TstC=0
+	while :; do
+	nohup &>/dev/null xdg-open $TMP/initial &
+	sleep .4
+	[[ `wmctrl -l|grep 'initial'` != "" ]] && break
+	[[ $TstC -ge '2' ]] && break
+	(( TstC+=1 ))
+	done
+	sleep 2
+	if [[ `wmctrl -l|awk '/initial/{print $1}'` != "" ]]; then
+	sleep 1
+	xdotool windowminimize `wmctrl -l|awk '/initial/{print $1}'` &>/dev/null
+	sleep 2
+	xdotool windowactivate `wmctrl -l|awk '/initial/{print $1}'` &>/dev/null
+	sleep 2
+	xdotool windowclose `wmctrl -l|awk '/initial/{print $1}'` &>/dev/null
+	fi
+	sleep 1
+	xdotool mousemove --sync 13 730 &>/dev/null
+	sleep 1
+	xdotool mousemove --sync 1333 730 &>/dev/null
+	SyncC=3
+	while :; do
+	xdotool mousemove --sync $SyncC $SyncC &>/dev/null
+	(( SyncC+=2 )) ; sleep .02
+	[[ $SyncC -ge '766' ]] && break
+	done
+	sleep 1
+	xdotool click 3 &>/dev/null
+	sleep 2
+	xdotool click 1 &>/dev/null
+	sleep 1
+	xdotool mousemove --sync 630 450 &>/dev/null
+	sleep .5
+	xdotool click 1 &>/dev/null
+}
+
+FuncMainTest() {
+FuncRunSomePrg &
+while :; do 
 cat <<EOF
 $counter
 ($counter%)
 EOF
-(( counter-=3 ))
-ps -Ao pcpu,args|egrep -v '^ 0|%'|awk '{print $1,$2}'| tee -a /tmp/cpuinfo
-echo -e "\n" >>/tmp/cpuinfo
-[[ $counter -lt '4' ]] && break; sleep 1
-done | dialog --title "${message[2]}" --gauge "" 0 45;;
-   1) exit 0;;
-esac
-clear; tput bold
-tput setaf 208
-echo -e "\n${message[3]} \n"
-tput setaf 219
-cat /tmp/cpuinfo
-while read line; do
-if [[ $(echo $line|grep '^[0-9]'|awk '{print $1}'|cut -d. -f1) -ge 30 ]]; then
-echo $line >>/tmp/cpuwarning
-fi
-done <<<$(cat /tmp/cpuinfo)
-tput setaf 208
-if [[ -e /tmp/cpuwarning ]] && [[ -e /usr/share/sounds/gnome/default/alerts/Xylo.ogg ]]; then
-VLM=`amixer sget 'Master'|grep '[0-9]%'|cut -d[ -f2|cut -d% -f1|head -1`
-amixer sset 'Master' 90% &>/dev/null
-sleep 1
-canberra-gtk-play --file="/usr/share/sounds/gnome/default/alerts/Xylo.ogg" &
-echo -e "\n ${message[4]}\n "
-amixer sset 'Master' $VLM% &>/dev/null
-tput setaf 226
-cat /tmp/cpuwarning
-elif [[ -e /tmp/cpuwarning ]]; then
-echo -e "\n ${message[4]}\n "
-tput setaf 226
-cat /tmp/cpuwarning
-fi
-tput sgr0
+(( counter-=1 ))
+echo -e "Zaman : `date +%H:%M:%S`\n`ps -Ao pcpu,args| \
+egrep -v '^ 0|%'| awk '{print $1,$2}'`\n" >>$TMP/cpuinfo
+[[ -e $TMP/initial ]] || cat $TMP/cpuinfo >$TMP/initial
+[[ $counter -lt '1' ]] && break; sleep $Runtime; done \
+| dialog --backtitle "$BACKTITLE" --title "${message[6]}" \
+--gauge "${message[7]}" 9 45
+}
+FuncSelectMenu() {
+  FuncSetDialColor 'screen_color = (WHITE,GREEN,ON)'
+    dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+    dialog --backtitle "$BACKTITLE" --title "${message[2]}" \
+    --menu "${message[3]}" 17 40 4 \
+ 	"1" $"90 saniye" \
+ 	"2" $"120 saniye" \
+ 	"3" $"150 saniye" \
+ 	"4" $"180 saniye" 2>$TMP/Runtime
+ 	case $? in
+ 	0) case `cat $TMP/Runtime` in
+ 	1) Runtime=.73;;
+ 	2) Runtime=1.1;;
+ 	3) Runtime=1.4;;
+ 	4) Runtime=1.5;;
+ 	 esac ;;
+	1) clear; exit ;;
+	esac
+	    dialog --backtitle "$BACKTITLE" --title "${message[4]}" \
+	    --menu "${message[5]}" 19 45 4 \
+	    "1" $"40 %" \
+ 	    "2" $"30 %" \
+ 	    "3" $"20 %" \
+ 	    "4" $"10 %" 2>$TMP/Cpurate
+ 	case $? in
+ 	0) case `cat $TMP/Cpurate` in
+ 	1) Cpurate=40;;
+ 	2) Cpurate=30;;
+ 	3) Cpurate=20;;
+ 	4) Cpurate=10;;
+ 	 esac ;;
+	1) clear; exit ;;
+	esac
+	FuncSetDialColor 'screen_color = (WHITE,RED,ON)'
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+}
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+	dialog --backtitle "$BACKTITLE" --title "${message[0]}" \
+	--yesno "${message[1]}" 15 52 2>&1
+	case $? in
+	0) FuncSelectMenu
+	FuncMainTest;;
+	1) clear; exit 0;;
+	esac
+
+        FuncSetDialColor 'screen_color = (WHITE,YELLOW,ON)'
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+	dialog --backtitle "$BACKTITLE" --title "${message[0]}" \
+	--infobox "${message[8]}" 9 50
+	sleep 18
+	while :; do
+	  ps -Ao pcpu,args|egrep -v '^ 0|%'| \
+	  awk '{print $1,$2}' >>$TMP/cpuanalysis
+	  sleep 1
+	  [[ $ATiMe -eq 0 ]] && break
+	  let ATiMe=ATiMe-1
+	done
+	
+	while read line; do
+	  if [[ `echo $line|grep '^[0-9]'|awk '{print $1}'| \
+	  cut -d. -f1` -ge $Cpurate ]]; then
+	  echo $line >>$TMP/cpuwarning; fi
+	done <<<$(cat $TMP/cpuinfo)
+	
+	if [[ $CKRD -le 2 ]]; then
+	    CrtLevel=20
+	elif [[ $CKRD -eq 4 ]]; then
+	    CrtLevel=15
+	elif [[ $CKRD -gt 4 ]]; then
+	    CrtLevel=10
+	else
+	    CrtLevel=15
+	fi
+
+	while read line; do
+	  if [[ `echo $line|grep '^[0-9]'|awk '{print $1}'| \
+	  cut -d. -f1` -ge $CrtLevel ]]; then
+	  echo $line >>$TMP/cpucrt; fi
+	done <<<$(cat $TMP/cpuanalysis)
+	
+	while read line; do
+	  if [[ `echo $line|grep '^[0-9]'|awk '{print $1}'| \
+	  cut -d. -f1` -ge $CrtLevel ]]; then
+	  echo $line >>$TMP/cpucrtinit; fi
+	done <<<$(cat $TMP/initial)
+
+    FuncSetDialColor 'screen_color = (WHITE,CYAN,ON)'
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+	dialog --backtitle "$BACKTITLE" --title "${message[0]}" \
+	--infobox "${message[9]}" 5 52 ; sleep 3
+	if [[ -e $TMP/cpucrt ]] && [[ -e $TMP/cpucrtinit ]]; then
+	   Critical=`cat $TMP/cpucrt|awk '{print $2}'`
+	  while read line; do
+	    if [[ $(grep "`echo $line|awk '{print $2}'`" <<<"$Critical") != "" ]]; then
+	    echo $line >>$TMP/cpucritical
+	    fi
+	  done <<<$(cat $TMP/cpucrtinit)
+	else
+	sleep 1  
+	fi
+	
+	if [[ -e $TMP/cpucritical ]] && [[ -e ~/.local/Cpuinfo.log ]]; then
+	   Crtlog=`cat ~/.local/Cpuinfo.log|awk '/\//{print $2}'`
+	  while read line; do
+	    if [[ $(grep "`echo $line|awk '{print $2}'`" <<<"$Crtlog") != "" ]]; then
+	    OldCrt=true
+	    fi
+	  done <<<$(cat $TMP/cpucritical)
+	elif [[ -e $TMP/cpucritical ]] && [[ ! -e ~/.local/Cpuinfo.log ]]; then
+	    echo -e "\n$(date)\n$(cat $TMP/cpucritical)" >>~/.local/Cpuinfo.log
+	else
+	    sleep 1  
+	fi
+    
+    FuncSetDialColor 'screen_color = (CYAN,BLUE,ON)'
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 1
+	dialog --backtitle "$BACKTITLE" --title "${message[0]}" \
+	--infobox "${message[10]}" 5 45 ; sleep 4
+        dialog --backtitle "$BACKTITLE" --infobox "" 1 1 ; sleep 2
+	clear; tput bold; sleep 1
+	echo -e "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" 
+	    
+FuncCrtSound() {	    
+	if which canberra-gtk-play &>/dev/null; then
+	    VLM=`amixer sget 'Master'|grep '[0-9]%'| \
+	    cut -d[ -f2|cut -d% -f1|head -1`
+	    amixer sset 'Master' 90% &>/dev/null
+	    sleep 1
+	if test -e ${Ssound[1]}; then
+	    canberra-gtk-play --file="${Ssound[1]}"
+	else
+	    canberra-gtk-play --id "${Ssound[2]}"
+	  fi
+	    amixer sset 'Master' $VLM% &>/dev/null
+	  fi
+}
+FuncLogRecord() {
+	OldLog=`cat ~/.local/Cpuinfo.log|tail -10`
+	echo -e "\n$(date)\n$OldLog" >~/.local/Cpuinfo.log
+	echo -e "\n$(date)\n$(cat $TMP/cpucritical)" \
+	>>~/.local/Cpuinfo.log
+}
+
+	if test -e $TMP/cpuinfo; then
+		tput setaf 147
+		echo -e "\n${message[11]}"
+		tput setaf 138
+		cat $TMP/cpuinfo
+	fi
+	if test -e $TMP/cpuwarning; then
+		tput setaf 147
+		echo -e "\n${message[12]}"
+		tput setaf 214
+		cat $TMP/cpuwarning
+	fi
+	if test -e $TMP/cpucritical; then
+		tput setaf 167
+		FuncCrtSound
+		echo -e "\n${message[13]}"
+		tput setaf 162
+		cat $TMP/cpucritical
+	if [[ ! -z $OldCrt ]]; then
+		tput setaf 167
+		echo -e "\n${message[19]}"
+		tput setaf 160
+		cat ~/.local/Cpuinfo.log
+		FuncLogRecord
+	fi
+	else
+		tput setaf 111
+		FuncCrtSound
+		echo -e "\n${message[18]} \n"
+	fi
+
+	tput sgr0
